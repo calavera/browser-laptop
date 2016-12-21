@@ -77,6 +77,7 @@ const contentSettings = require('../js/state/contentSettings')
 const privacy = require('../js/state/privacy')
 const async = require('async')
 const settings = require('../js/constants/settings')
+const sync = require('./sync')
 
 // temporary fix for #4517, #4518 and #4472
 app.commandLine.appendSwitch('enable-use-zoom-for-dsf', 'false')
@@ -422,6 +423,7 @@ app.on('ready', () => {
     TrackingProtection.init()
     AdBlock.init()
     AdInsertion.init()
+    sync.init()
 
     if (!loadedPerWindowState || loadedPerWindowState.length === 0) {
       if (!CmdLine.newWindowURL()) {
