@@ -10,6 +10,10 @@ AppStore
 ```javascript
 {
   firstRunTimestamp: integer,
+  sync: {
+    deviceId: Uint8Array,
+    seed: Uint8Array
+  },
   tabs: [{
     // persistent properties
     url: string,

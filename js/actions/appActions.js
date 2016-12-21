@@ -787,8 +787,20 @@ const appActions = {
       tabId,
       options
     })
-  }
+  },
 
+  /**
+   * Dispatches a message when sync init data needs to be saved
+   * @param {Buffer|null} seed
+   * @param {Buffer|null} deviceId
+   */
+  saveSyncInitData: function (seed, deviceId) {
+    AppDispatcher.dispatch({
+      actionType: appConstants.APP_SAVE_SYNC_INIT_DATA,
+      seed,
+      deviceId
+    })
+  }
 }
 
 module.exports = appActions

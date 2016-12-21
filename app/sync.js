@@ -9,7 +9,7 @@ const ipcMain = electron.ipcMain
 const messages = require('../js/constants/sync/messages')
 const categories = require('../js/constants/sync/proto').categories
 const config = require('../js/constants/appConfig').sync
-// const appActions = require('../js/actions/appActions')
+const appActions = require('../js/actions/appActions')
 
 const categoryNames = Object.keys(categories)
 
@@ -29,21 +29,14 @@ const onSyncReady = (e) => {
   }, config.sendInterval)
 }
 
-module.exports.init = function (seed, deviceId) {
-  seed = seed || null
-  deviceId = deviceId || null
+module.exports.init = function (state) {
   ipcMain.on(messages.GET_INIT_DATA, (e) => {
+    const seed = state.seed ? state.seed.data : null
+    const deviceId = state.deviceId ? state.deviceId.data : null
     e.sender.send(messages.GOT_INIT_DATA, seed, deviceId, config)
   })
   ipcMain.on(messages.SAVE_INIT_DATA, (e, seed, deviceId) => {
-    /*
-    if (seed) {
-      appActions.saveSyncSeed(seed)
-    }
-    if (deviceId) {
-      appActions.saveSyncDeviceId(seed)
-    }
-    */
+    appActions.saveSyncInitData(seed, deviceId)
   })
   ipcMain.on(messages.SYNC_READY, onSyncReady)
 }

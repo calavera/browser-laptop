@@ -411,6 +411,7 @@ app.on('ready', () => {
     delete initialState.perWindowState
     appActions.setState(Immutable.fromJS(initialState))
     Menu.init(initialState, null)
+    sync.init(initialState.sync || {})
     return loadedPerWindowState
   }).then((loadedPerWindowState) => {
     contentSettings.init()
@@ -423,7 +424,6 @@ app.on('ready', () => {
     TrackingProtection.init()
     AdBlock.init()
     AdInsertion.init()
-    sync.init()
 
     if (!loadedPerWindowState || loadedPerWindowState.length === 0) {
       if (!CmdLine.newWindowURL()) {
