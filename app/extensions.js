@@ -147,9 +147,11 @@ let generateBraveManifest = () => {
     // allow access to webpack dev server resources
     let devServer = 'localhost:' + process.env.npm_package_config_port
     cspDirectives['default-src'] = '\'self\' http://' + devServer
-    // Assumes sync server is running on localhost:4000
-    cspDirectives['connect-src'] = ['\'self\'', 'http://' + devServer, 'ws://' + devServer,
-      'http://localhost:4000', 'https://brave-sync-test.s3-us-west-2.amazonaws.com'].join(' ')
+    cspDirectives['connect-src'] = ['\'self\'',
+      'http://' + devServer,
+      'ws://' + devServer,
+      appConfig.sync.serverUrl,
+      appConfig.sync.s3Url].join(' ')
     cspDirectives['style-src'] = '\'self\' \'unsafe-inline\' http://' + devServer
   }
 

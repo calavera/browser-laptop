@@ -100,6 +100,14 @@ module.exports = {
     baseUrl: `${updateHost}/1/releases`,
     winBaseUrl: `${winUpdateHost}/multi-channel/releases/CHANNEL/`
   },
+  sync: {
+    serverUrl: 'https://sync-staging.brave.com',
+    // TODO: support other regions
+    s3Url: 'https://brave-sync-staging.s3-us-west-2.amazonaws.com',
+    apiVersion: '0',
+    fetchInterval: 5000,
+    sendInterval: 7000
+  },
   urlSuggestions: {
     ageDecayConstant: 50
   },
