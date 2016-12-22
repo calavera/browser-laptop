@@ -103,6 +103,7 @@ module.exports = {
     winBaseUrl: `${winUpdateHost}/multi-channel/releases/CHANNEL/`
   },
   sync: {
+    enabled: true,
     apiVersion: '0',
     serverUrl: isProduction ? 'https://sync.brave.com' : 'https://sync-staging.brave.com',
     debug: true,

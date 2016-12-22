@@ -29,6 +29,9 @@ const onSyncReady = (e) => {
 }
 
 module.exports.init = function (state) {
+  if (config.enabled !== true) {
+    return
+  }
   ipcMain.on(messages.GET_INIT_DATA, (e) => {
     const seed = state.seed ? state.seed.data : null
     const deviceId = state.deviceId ? state.deviceId.data : null
