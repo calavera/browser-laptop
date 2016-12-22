@@ -14,7 +14,6 @@ const appActions = require('../js/actions/appActions')
 const categoryNames = Object.keys(categories)
 
 const onSyncReady = (e) => {
-  console.log('sync is ready!')
   ipcMain.on(messages.RECEIVE_SYNC_RECORDS, (event, categoryName, records) => {
     if (categoryNames.includes(categoryName) || !records || !records.length) {
       return
@@ -39,4 +38,7 @@ module.exports.init = function (state) {
     appActions.saveSyncInitData(seed, deviceId)
   })
   ipcMain.on(messages.SYNC_READY, onSyncReady)
+  ipcMain.on(messages.SYNC_DEBUG, (e, msg) => {
+    console.log('sync-client:', msg)
+  })
 }
