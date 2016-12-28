@@ -4,6 +4,7 @@
 
 'use strict'
 
+const Immutable = require('immutable')
 const electron = require('electron')
 const crypto = require('crypto')
 const ipcMain = electron.ipcMain
@@ -12,6 +13,8 @@ const categories = require('../js/constants/sync/proto').categories
 const syncActions = require('../js/constants/sync/proto').actions
 const config = require('../js/constants/appConfig').sync
 const appActions = require('../js/actions/appActions')
+const appConstants = require('../js/constants/appConstants')
+const appDispatcher = require('../js/dispatcher/appDispatcher')
 const AppStore = require('../js/stores/appStore')
 
 const categoryNames = Object.keys(categories)
@@ -23,6 +26,13 @@ const categoryMap = {
 }
 
 let deviceId = null /** @type {Array|null} */
+
+/**
+ * Gets current time in seconds
+ */
+const now = () => {
+  return Math.floor(Date.now() / 1000)
+}
 
 /**
  * Sends sync records of the same category to the sync server.
@@ -39,6 +49,9 @@ const sendSyncRecords = (sender, action, data) => {
   }
   const category = categoryMap[data[0].name]
   sender.send(messages.SEND_SYNC_RECORDS, category, data.map((item) => {
+    if (!item || !item.name || !item.value) {
+      return
+    }
     return {
       action,
       deviceId,
@@ -58,22 +71,33 @@ const isBookmark = (site) => {
     (site.tags.includes('bookmark') || site.tags.includes('bookmark-folder')))
 }
 
+/**
+ * Converts a site object into input for sendSyncRecords
+ * @param {Object} site
+ * @returns {{name: string, value: object}}
+ */
 const createSiteData = (site) => {
-  let siteData = {}
-  ;['location', 'title', 'customTitle', 'favicon', 'lastAccessedTime', 'creationTime'].forEach((field) => {
+  const siteData = {
+    location: '',
+    title: '',
+    customTitle: '',
+    lastAccessedTime: 0,
+    creationTime: 0
+  }
+  for (let field in site) {
     siteData[field] = site[field]
-  })
+  }
   if (isBookmark(site)) {
     return {
       name: 'bookmark',
       value: {
         site: siteData,
         isFolder: site.tags.includes('bookmark-folder'),
-        folderId: site.folderId,
-        parentFolderId: site.parentFolderId
+        folderId: site.folderId || 0,
+        parentFolderId: site.parentFolderId || 0
       }
     }
-  } else {
+  } else if (!site.tags || !site.tags.length) {
     return {
       name: 'historySite',
       value: siteData
@@ -81,6 +105,12 @@ const createSiteData = (site) => {
   }
 }
 
+/**
+ * Converts a site settings object into input for sendSyncRecords
+ * @param {string} hostPattern
+ * @param {Object} setting
+ * @returns {{name: string, value: object}}
+ */
 const createSiteSettingsData = (hostPattern, setting) => {
   const adControlEnum = {
     showBraveAds: 0,
@@ -92,52 +122,82 @@ const createSiteSettingsData = (hostPattern, setting) => {
     allowAllCookies: 1
   }
   const value = {
-    hostPattern
+    hostPattern: hostPattern || '',
+    zoomLevel: 0,
+    shieldsUp: true,
+    adControl: 1,
+    cookieControl: 0,
+    safeBrowsing: true,
+    noScript: false,
+    httpsEverywhere: true,
+    fingerprintingProtection: false,
+    ledgerPayments: true,
+    ledgerPaymentsShown: true
   }
-  ;['zoomLevel', 'shieldsUp', 'safeBrowsing', 'noScript', 'httpsEverywhere',
-  'fingerprintingProtection', 'ledgerPayments', 'ledgerPaymentsShown'].forEach((field) => {
-    value[field] = setting[field]
-  })
-  if (setting.adControl) {
-    value.adControl = adControlEnum[setting.adControl]
+
+  for (let field in setting) {
+    if (field === 'adControl') {
+      value.adControl = adControlEnum[setting.adControl]
+    } else if (field === 'cookieControl') {
+      value.cookieControl = cookieControlEnum[setting.cookieControl]
+    } else {
+      value[field] = setting[field]
+    }
   }
-  if (setting.cookieControl) {
-    value.cookieControl = cookieControlEnum[setting.cookieControl]
-  }
+
   return {
     name: 'siteSetting',
     value
   }
 }
 
-module.exports.onFirstRun = (sender) => {
-  // Sync the device id for this device
-  sendSyncRecords(sender, syncActions.CREATE, [{
-    name: 'device',
-    value: {
-      name: 'browser-laptop' // todo: support user-chosen names
-    }
-  }])
-  // Sync old data
-  const appState = AppStore.getState()
-  const sites = appState.get('sites').toJS()
-  const bookmarks = sites ? sites.filter(isBookmark) : null
-  if (bookmarks) {
-    // Only sync bookmarks for now to save bandwidth
-    sendSyncRecords(sender, syncActions.CREATE, bookmarks.map(createSiteData))
-  }
-  const siteSettings = appState.get('siteSettings').toJS()
-  if (siteSettings) {
-    sendSyncRecords(sender, syncActions.CREATE,
-      Object.keys(siteSettings).map((item) => {
-        return createSiteSettingsData(item, siteSettings[item])
-      }))
+const doAction = (sender, action) => {
+  switch (action.actionType) {
+    case appConstants.APP_ADD_SITE:
+      if (action.siteDetail.constructor === Immutable.Map) {
+        sendSyncRecords(sender, syncActions.CREATE, [createSiteData(action.siteDetail.toJS())])
+      }
+      break
+    case appConstants.APP_REMOVE_SITE:
+      if (action.siteDetail.constructor === Immutable.Map) {
+        sendSyncRecords(sender, syncActions.DELETE, [createSiteData(action.siteDetail.toJS())])
+      }
+      break
+    default:
   }
 }
 
-module.exports.onSyncReady = (isFirstRun, e) => {
+/**
+ * Called when sync client is done initializing.
+ * @param {boolean} isFirstRun - whether this is the first time sync is running
+ * @param {number} lastFetchTimestamp - timestamp in s when the last sync fetch occured
+ * @param {Event} e
+ */
+module.exports.onSyncReady = (isFirstRun, lastFetchTimestamp, e) => {
+  appDispatcher.register(doAction.bind(null, e.sender))
   if (isFirstRun) {
-    module.exports.onFirstRun(e.sender)
+    // Sync the device id for this device
+    sendSyncRecords(e.sender, syncActions.CREATE, [{
+      name: 'device',
+      value: {
+        name: 'browser-laptop' // todo: support user-chosen names
+      }
+    }])
+    // Sync old data
+    const appState = AppStore.getState()
+    const sites = appState.get('sites').toJS()
+    const bookmarks = sites ? sites.filter(isBookmark) : null
+    if (bookmarks) {
+      // Don't sync full history for now to save bandwidth
+      sendSyncRecords(e.sender, syncActions.CREATE, bookmarks.map(createSiteData))
+    }
+    const siteSettings = appState.get('siteSettings').toJS()
+    if (siteSettings) {
+      sendSyncRecords(e.sender, syncActions.CREATE,
+        Object.keys(siteSettings).map((item) => {
+          return createSiteSettingsData(item, siteSettings[item])
+        }))
+    }
   }
   ipcMain.on(messages.RECEIVE_SYNC_RECORDS, (event, categoryName, records) => {
     if (categoryNames.includes(categoryName) || !records || !records.length) {
@@ -145,8 +205,12 @@ module.exports.onSyncReady = (isFirstRun, e) => {
     }
     // TODO: update appstate
   })
+  // Periodically poll for new records
+  let startAt = lastFetchTimestamp
   setInterval(() => {
-    e.sender.send(messages.FETCH_SYNC_RECORDS, categoryNames)
+    e.sender.send(messages.FETCH_SYNC_RECORDS, categoryNames, startAt)
+    startAt = now()
+    appActions.saveSyncInitData(null, null, startAt)
   }, config.fetchInterval)
 }
 
@@ -167,7 +231,8 @@ module.exports.init = function (initialState) {
     appActions.saveSyncInitData(seed, newDeviceId)
   })
   ipcMain.on(messages.SYNC_READY, module.exports.onSyncReady.bind(null,
-    !initialState.seed && !initialState.deviceId))
+    !initialState.seed && !initialState.deviceId,
+    initialState.lastFetchTimestamp || 0))
   ipcMain.on(messages.SYNC_DEBUG, (e, msg) => {
     console.log('sync-client:', msg)
   })

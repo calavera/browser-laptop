@@ -793,12 +793,14 @@ const appActions = {
    * Dispatches a message when sync init data needs to be saved
    * @param {Buffer|null} seed
    * @param {Buffer|null} deviceId
+   * @param {number|null} lastFetchTimestamp
    */
-  saveSyncInitData: function (seed, deviceId) {
+  saveSyncInitData: function (seed, deviceId, lastFetchTimestamp) {
     AppDispatcher.dispatch({
       actionType: appConstants.APP_SAVE_SYNC_INIT_DATA,
       seed,
-      deviceId
+      deviceId,
+      lastFetchTimestamp
     })
   }
 }
