@@ -55,10 +55,24 @@ const sendSyncRecords = (sender, action, data) => {
     return {
       action,
       deviceId,
-      objectId: Array.from(crypto.randomBytes(16)),
+      objectId: item.objectId,
       [item.name]: item.value
     }
   }))
+}
+
+/**
+ * Sets a new object ID for an existing object in appState
+ * @param {Array.<string>} objectPath - Path to get to the object from appState root,
+ *   for use with Immutable.setIn
+ * @param {Object=} listFilter - if path leads to a list, this is an object
+ *   to filter list members by
+ * @returns {Array.<number>}
+ */
+const newObjectId = (objectPath, listFilter) => {
+  const objectId = Array.from(crypto.randomBytes(16))
+  appActions.setObjectId(objectId, objectPath, listFilter)
+  return objectId
 }
 
 /**
@@ -74,7 +88,7 @@ const isBookmark = (site) => {
 /**
  * Converts a site object into input for sendSyncRecords
  * @param {Object} site
- * @returns {{name: string, value: object}}
+ * @returns {{name: string, value: object, objectId: Array.<number>}}
  */
 const createSiteData = (site) => {
   const siteData = {
@@ -85,11 +99,20 @@ const createSiteData = (site) => {
     creationTime: 0
   }
   for (let field in site) {
-    siteData[field] = site[field]
+    if (field in siteData) {
+      siteData[field] = site[field]
+    }
   }
   if (isBookmark(site)) {
     return {
       name: 'bookmark',
+      objectId: site.objectId || newObjectId(['sites'], {
+        location: site.location,
+        creationTime: site.creationTime,
+        tags: Immutable.fromJS(site.tags),
+        folderId: site.folderId,
+        parentFolderId: site.parentFolderId
+      }),
       value: {
         site: siteData,
         isFolder: site.tags.includes('bookmark-folder'),
@@ -100,6 +123,11 @@ const createSiteData = (site) => {
   } else if (!site.tags || !site.tags.length) {
     return {
       name: 'historySite',
+      objectId: site.objectId || newObjectId(['sites'], {
+        location: site.location,
+        tags: Immutable.fromJS(site.tags),
+        creationTime: site.creationTime
+      }),
       value: siteData
     }
   }
@@ -109,7 +137,7 @@ const createSiteData = (site) => {
  * Converts a site settings object into input for sendSyncRecords
  * @param {string} hostPattern
  * @param {Object} setting
- * @returns {{name: string, value: object}}
+ * @returns {{name: string, value: object, objectId: Array.<number>}}
  */
 const createSiteSettingsData = (hostPattern, setting) => {
   const adControlEnum = {
@@ -140,13 +168,14 @@ const createSiteSettingsData = (hostPattern, setting) => {
       value.adControl = adControlEnum[setting.adControl]
     } else if (field === 'cookieControl') {
       value.cookieControl = cookieControlEnum[setting.cookieControl]
-    } else {
+    } else if (field in value) {
       value[field] = setting[field]
     }
   }
 
   return {
     name: 'siteSetting',
+    objectId: setting.objectId || newObjectId(['siteSettings', hostPattern]),
     value
   }
 }
@@ -179,6 +208,7 @@ module.exports.onSyncReady = (isFirstRun, lastFetchTimestamp, e) => {
     // Sync the device id for this device
     sendSyncRecords(e.sender, syncActions.CREATE, [{
       name: 'device',
+      objectId: newObjectId(['sync']),
       value: {
         name: 'browser-laptop' // todo: support user-chosen names
       }

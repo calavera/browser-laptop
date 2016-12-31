@@ -823,6 +823,38 @@ const handleAppAction = (action) => {
       const pdf = require('../../app/pdf')
       appState = pdf.renderUrlToPdf(appState, action)
       break
+    case appConstants.APP_SET_OBJECT_ID:
+      let obj = appState.getIn(action.objectPath)
+      if (action.listFilter) {
+        obj = obj || new Immutable.List()
+        let newIndex
+        let newItem
+        obj.forEach((item, i) => {
+          for (let field in action.listFilter) {
+            let value = item.get(field)
+            let expected = action.listFilter[field]
+            if (value && value.equals) {
+              if (!value.equals(expected)) {
+                return true
+              }
+            } else if (value !== expected) {
+              return true
+            }
+          }
+          newItem = item.set('objectId', action.objectId)
+          newIndex = i
+          return false
+        })
+        if (newItem) {
+          obj = obj.set(newIndex, newItem)
+        }
+      } else {
+        obj = obj || new Immutable.Map()
+        obj = obj.set('objectId', action.objectId)
+      }
+      console.log('setting', action.objectPath, obj.toJS())
+      appState = appState.setIn(action.objectPath, obj)
+      break
     case appConstants.APP_SAVE_SYNC_INIT_DATA:
       if (action.deviceId) {
         appState = appState.setIn(['sync', 'deviceId'], action.deviceId)
